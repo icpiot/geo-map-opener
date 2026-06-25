@@ -1,0 +1,13 @@
+﻿# Windows clutter
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Build artefacts (never commit)
+*.pem
+*.crx
+*.zip
+
+# Future build/output dirs
+node_modules/
+dist/
