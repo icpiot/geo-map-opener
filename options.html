@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Geo Map Opener Settings</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; margin: 32px; max-width: 640px; color: #1f2937; }
+    h1 { font-size: 24px; }
+    label { display: block; margin: 24px 0 8px; font-weight: 600; }
+    select, button { font: inherit; padding: 8px 10px; }
+    #status { margin-left: 10px; color: #176b2c; }
+  </style>
+</head>
+<body>
+  <h1>Geo Map Opener Settings</h1>
+  <p>Choose the map site used by <strong>Use as Geo Coordinate</strong>.</p>
+  <label for="provider">Default map provider</label>
+  <select id="provider">
+    <option value="google">Google Maps</option>
+    <option value="openstreetmap">OpenStreetMap</option>
+    <option value="bing">Bing Maps</option>
+    <option value="apple">Apple Maps</option>
+    <option value="waze">Waze</option>
+    <option value="here">HERE WeGo</option>
+    <option value="mapquest">MapQuest</option>
+  </select>
+  <p><button id="save">Save</button><span id="status" role="status"></span></p>
+  <script src="options.js"></script>
+</body>
+</html>

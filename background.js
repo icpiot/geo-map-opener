@@ -1,5 +1,43 @@
 const firstByTab = new Map();
 const smartCoordinateByTab = new Map();
+const DEFAULT_PROVIDER = "google";
+const PROVIDERS = {
+  google: {
+    title: "Google Maps",
+    buildUrl: (latitude, longitude) =>
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${latitude},${longitude}`)}`
+  },
+  openstreetmap: {
+    title: "OpenStreetMap",
+    buildUrl: (latitude, longitude) =>
+      `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}&zoom=16`
+  },
+  bing: {
+    title: "Bing Maps",
+    buildUrl: (latitude, longitude) =>
+      `https://bing.com/maps/default.aspx?cp=${latitude}~${longitude}&lvl=16`
+  },
+  apple: {
+    title: "Apple Maps",
+    buildUrl: (latitude, longitude) =>
+      `https://maps.apple.com/?ll=${latitude},${longitude}`
+  },
+  waze: {
+    title: "Waze",
+    buildUrl: (latitude, longitude) =>
+      `https://www.waze.com/ul?ll=${encodeURIComponent(`${latitude},${longitude}`)}&navigate=yes`
+  },
+  here: {
+    title: "HERE WeGo",
+    buildUrl: (latitude, longitude) =>
+      `https://wego.here.com/directions/mix//${latitude},${longitude}`
+  },
+  mapquest: {
+    title: "MapQuest",
+    buildUrl: (latitude, longitude) =>
+      `https://www.mapquest.com/latlng/${latitude},${longitude}`
+  }
+};
 
 function extractNumber(text) {
   const match = String(text ?? "").match(/[-+]?\d+(\.\d+)?/);
@@ -13,15 +51,34 @@ function setupContextMenu() {
       title: "Use as Geo Coordinate",
       contexts: ["all"]
     });
+    chrome.contextMenus.create({
+      id: "use-geo-provider",
+      title: "Use as Geo Coordinate in...",
+      contexts: ["all"]
+    });
+    for (const [id, provider] of Object.entries(PROVIDERS)) {
+      chrome.contextMenus.create({
+        id: `use-geo-${id}`,
+        parentId: "use-geo-provider",
+        title: provider.title,
+        contexts: ["all"]
+      });
+    }
+    chrome.contextMenus.create({
+      id: "geo-options",
+      title: "Map provider settings...",
+      contexts: ["all"]
+    });
   });
 }
 
-function openCoordinate(tabId, coordinate) {
+function openCoordinate(tabId, coordinate, providerId = DEFAULT_PROVIDER) {
   if (!coordinate) return false;
   const { latitude, longitude } = coordinate;
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
 
-  chrome.tabs.create({ url: `https://maps.google.com/?q=${latitude},${longitude}` });
+  const provider = PROVIDERS[providerId] || PROVIDERS[DEFAULT_PROVIDER];
+  chrome.tabs.create({ url: provider.buildUrl(latitude, longitude) });
   smartCoordinateByTab.delete(tabId);
   firstByTab.delete(tabId);
   return true;
@@ -81,41 +138,50 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId !== "use-geo") return;
-
-  const tabId = tab && tab.id;
-  const smart = tabId == null ? null : smartCoordinateByTab.get(tabId);
-  if (smart && Date.now() - smart.timestamp < 10000 && openCoordinate(tabId, smart.coordinate)) {
+  if (info.menuItemId === "geo-options") {
+    chrome.runtime.openOptionsPage();
     return;
   }
 
-  if (tabId == null) return;
+  const providerId = info.menuItemId.startsWith("use-geo-")
+    ? info.menuItemId.slice("use-geo-".length)
+    : null;
+  if (info.menuItemId !== "use-geo" && !PROVIDERS[providerId]) return;
 
-  const frameId = Number.isInteger(info.frameId) ? info.frameId : 0;
-  const fallback = () => {
-    chrome.tabs.sendMessage(tabId, { type: "get-geo-context" }, { frameId }, (response) => {
-      if (!chrome.runtime.lastError && openCoordinate(tabId, response?.coordinate)) return;
+  const tabId = tab && tab.id;
+  chrome.storage.sync.get({ defaultProvider: DEFAULT_PROVIDER }, (settings) => {
+    const provider = providerId || settings.defaultProvider || DEFAULT_PROVIDER;
+    const smart = tabId == null ? null : smartCoordinateByTab.get(tabId);
+    if (smart && Date.now() - smart.timestamp < 10000 && openCoordinate(tabId, smart.coordinate, provider)) return;
 
-      const num = extractNumber(info.selectionText);
-      if (!num) return;
+    if (tabId == null) return;
 
-      if (!firstByTab.has(tabId)) {
-        firstByTab.set(tabId, num);
-        return;
-      }
+    const frameId = Number.isInteger(info.frameId) ? info.frameId : 0;
+    const fallback = () => {
+      chrome.tabs.sendMessage(tabId, { type: "get-geo-context" }, { frameId }, (response) => {
+        if (!chrome.runtime.lastError && openCoordinate(tabId, response?.coordinate, provider)) return;
 
-      openCoordinate(tabId, {
-        latitude: Number(firstByTab.get(tabId)),
-        longitude: Number(num)
+        const num = extractNumber(info.selectionText);
+        if (!num) return;
+
+        if (!firstByTab.has(tabId)) {
+          firstByTab.set(tabId, num);
+          return;
+        }
+
+        openCoordinate(tabId, {
+          latitude: Number(firstByTab.get(tabId)),
+          longitude: Number(num)
+        }, provider);
       });
-    });
-  };
+    };
 
-  // Scan the active frame at click time so dynamically-created popups work too.
-  chrome.scripting.executeScript({
-    target: { tabId, frameIds: [frameId] },
-    func: scanActivePageForCoordinate
-  }).then((results) => {
-    if (!openCoordinate(tabId, results[0]?.result)) fallback();
-  }).catch(fallback);
+    // Scan the active frame at click time so dynamically-created popups work too.
+    chrome.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      func: scanActivePageForCoordinate
+    }).then((results) => {
+      if (!openCoordinate(tabId, results[0]?.result, provider)) fallback();
+    }).catch(fallback);
+  });
 });
