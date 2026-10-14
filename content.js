@@ -45,34 +45,6 @@ function classify(value, label) {
   return null;
 }
 
-function valueFromBoundField(scope, binding) {
-  const fields = [];
-  if (scope instanceof Element && scope.matches(`[data-bind*="${binding}"]`)) fields.push(scope);
-  if (scope instanceof Element) fields.push(...scope.querySelectorAll(`[data-bind*="${binding}"]`));
-
-  const field = fields.find((element) => element.matches("input, textarea, select"));
-  if (!field) return null;
-
-  const value = Number(field.value);
-  return Number.isFinite(value) ? value : null;
-}
-
-function findBoundCoordinate(target) {
-  let scope = target instanceof Element ? target : null;
-  for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
-    const latitude = valueFromBoundField(scope, "ClockInLatitude")
-      ?? valueFromBoundField(scope, "ClockOutLatitude");
-    const longitude = valueFromBoundField(scope, "ClockInLongitude")
-      ?? valueFromBoundField(scope, "ClockOutLongitude");
-
-    if (latitude !== null && longitude !== null) {
-      return { latitude, longitude };
-    }
-  }
-
-  return null;
-}
-
 function scopeFor(target) {
   let current = target instanceof Element ? target : document.body;
   let best = current;
@@ -118,9 +90,6 @@ function candidatesIn(scope, target) {
 }
 
 function findCoordinate(target, pointerX, pointerY) {
-  const boundCoordinate = findBoundCoordinate(target);
-  if (boundCoordinate) return boundCoordinate;
-
   let scope = target instanceof Element ? target : document.body;
   for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
     const candidates = candidatesIn(scope, target);

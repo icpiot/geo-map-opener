@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Geo Map Opener",
-  "version": "0.8",
+  "version": "0.9",
   "description": "Right\u2011click geo tool (smart mode)",
   "permissions": [
     "tabs",
