@@ -27,6 +27,38 @@ function openCoordinate(tabId, coordinate) {
   return true;
 }
 
+function scanActivePageForCoordinate() {
+  const numberValue = (field) => {
+    const value = Number(field.value ?? field.textContent);
+    return Number.isFinite(value) && Math.abs(value) <= 180 ? value : null;
+  };
+
+  const labelFor = (field) => {
+    const previous = field.previousElementSibling;
+    if (previous && previous.tagName === "LABEL") return previous.textContent;
+    const label = field.closest("label");
+    if (label) return label.textContent;
+    return [field.getAttribute("aria-label"), field.getAttribute("name"), field.id]
+      .filter(Boolean).join(" ");
+  };
+
+  const fields = Array.from(document.querySelectorAll("input, textarea, select"))
+    .map((field) => ({ field, value: numberValue(field), label: labelFor(field) }))
+    .filter((candidate) => candidate.value !== null);
+  const target = document.activeElement;
+  const targetField = fields.find((candidate) => candidate.field === target);
+
+  let scope = targetField ? targetField.field : document.body;
+  for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
+    const inScope = fields.filter((candidate) => scope.contains(candidate.field));
+    const latitude = inScope.find((candidate) => /(^|[^a-z])(lat|latitude)([^a-z]|$)/i.test(candidate.label) && Math.abs(candidate.value) <= 90);
+    const longitude = inScope.find((candidate) => /(^|[^a-z])(lon|lng|long|longitude)([^a-z]|$)/i.test(candidate.label));
+    if (latitude && longitude) return { latitude: latitude.value, longitude: longitude.value };
+  }
+
+  return null;
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   setupContextMenu();
 });
@@ -59,12 +91,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   if (tabId == null) return;
 
-  // Ask the frame that received the right-click for its latest DOM analysis.
-  chrome.tabs.sendMessage(
-    tabId,
-    { type: "get-geo-context" },
-    { frameId: Number.isInteger(info.frameId) ? info.frameId : 0 },
-    (response) => {
+  const frameId = Number.isInteger(info.frameId) ? info.frameId : 0;
+  const fallback = () => {
+    chrome.tabs.sendMessage(tabId, { type: "get-geo-context" }, { frameId }, (response) => {
       if (!chrome.runtime.lastError && openCoordinate(tabId, response?.coordinate)) return;
 
       const num = extractNumber(info.selectionText);
@@ -79,6 +108,14 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         latitude: Number(firstByTab.get(tabId)),
         longitude: Number(num)
       });
-    }
-  );
+    });
+  };
+
+  // Scan the active frame at click time so dynamically-created popups work too.
+  chrome.scripting.executeScript({
+    target: { tabId, frameIds: [frameId] },
+    func: scanActivePageForCoordinate
+  }).then((results) => {
+    if (!openCoordinate(tabId, results[0]?.result)) fallback();
+  }).catch(fallback);
 });
