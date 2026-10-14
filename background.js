@@ -49,6 +49,16 @@ function coordinateFromUrl(value) {
   let decoded = String(value);
   try { decoded = decodeURIComponent(decoded); } catch {}
 
+  const decimalCardinal = decoded.match(/([-+]?\d{1,3}(?:\.\d+)?)_([NS])_([-+]?\d{1,3}(?:\.\d+)?)_([EW])/i);
+  if (decimalCardinal) {
+    const latitude = Number(decimalCardinal[1]);
+    const longitude = Number(decimalCardinal[3]);
+    return {
+      latitude: /[S]/i.test(decimalCardinal[2]) ? -Math.abs(latitude) : Math.abs(latitude),
+      longitude: /[W]/i.test(decimalCardinal[4]) ? -Math.abs(longitude) : Math.abs(longitude)
+    };
+  }
+
   const geohack = decoded.match(/(\d{1,3})_(\d{1,2})_([\d.]+)_([NS])_(\d{1,3})_(\d{1,2})_([\d.]+)_([EW])/i);
   if (geohack) {
     const latitude = Number(geohack[1]) + Number(geohack[2]) / 60 + Number(geohack[3]) / 3600;

@@ -24,7 +24,14 @@ function parseCoordinateText(value) {
   let text = String(value || "").replace(/[\u00a0]/g, " ");
   try { text = decodeURIComponent(text); } catch {}
 
-  let match = text.match(/(\d{1,3})_(\d{1,2})_([\d.]+)_([NS])_(\d{1,3})_(\d{1,2})_([\d.]+)_([EW])/i);
+  let match = text.match(/([-+]?\d{1,3}(?:\.\d+)?)_([NS])_([-+]?\d{1,3}(?:\.\d+)?)_([EW])/i);
+  if (match) {
+    const latitude = withHemisphere(match[1], match[2]);
+    const longitude = withHemisphere(match[3], match[4]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  match = text.match(/(\d{1,3})_(\d{1,2})_([\d.]+)_([NS])_(\d{1,3})_(\d{1,2})_([\d.]+)_([EW])/i);
   if (match) {
     const latitude = dmsValue(match[1], match[2], match[3], match[4]);
     const longitude = dmsValue(match[5], match[6], match[7], match[8]);
