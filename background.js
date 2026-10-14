@@ -2,7 +2,7 @@ const firstByTab = new Map();
 const smartCoordinateByTab = new Map();
 
 function extractNumber(text) {
-  const match = text.match(/-?\d+(\.\d+)?/);
+  const match = String(text ?? "").match(/[-+]?\d+(\.\d+)?/);
   return match ? match[0] : null;
 }
 
