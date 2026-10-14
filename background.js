@@ -6,13 +6,22 @@ function extractNumber(text) {
   return match ? match[0] : null;
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: "use-geo",
-    title: "Use as Geo Coordinate",
-    contexts: ["selection"]
+function setupContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create({
+      id: "use-geo",
+      title: "Use as Geo Coordinate",
+      contexts: ["all"]
+    });
   });
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  setupContextMenu();
 });
+
+// Recreate the menu when the service worker starts, including after reloads.
+setupContextMenu();
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message.type !== "geo-context" || !sender.tab) return;
