@@ -74,13 +74,22 @@ function candidatesIn(scope, target) {
     const label = `${readableAttributes(element)} ${nearbyLabel(element)}`;
     const kind = classify(value, label);
     const distance = element === target || element.contains(target) || target.contains(element) ? 0 : 1;
-    candidates.push({ value, kind, distance, element });
+    const rect = element.getBoundingClientRect();
+    if (!rect.width && !rect.height) continue;
+    candidates.push({
+      value,
+      kind,
+      distance,
+      element,
+      centerX: rect.left + rect.width / 2,
+      centerY: rect.top + rect.height / 2
+    });
   }
 
   return candidates;
 }
 
-function findCoordinate(target) {
+function findCoordinate(target, pointerX, pointerY) {
   let scope = target instanceof Element ? target : document.body;
   for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
     const candidates = candidatesIn(scope, target);
@@ -107,11 +116,45 @@ function findCoordinate(target) {
     }
   }
 
+  // Last resort for table-style pages: pair the two visible numbers closest
+  // to the clicked field, favoring values in the same screen column.
+  const allCandidates = candidatesIn(document.body, target);
+  const targetRect = target instanceof Element ? target.getBoundingClientRect() : null;
+  const clickX = Number.isFinite(pointerX)
+    ? pointerX
+    : targetRect ? targetRect.left + targetRect.width / 2 : 0;
+  const clickY = Number.isFinite(pointerY)
+    ? pointerY
+    : targetRect ? targetRect.top + targetRect.height / 2 : 0;
+  let best = null;
+
+  for (const first of allCandidates) {
+    for (const second of allCandidates) {
+      if (first === second) continue;
+      const firstIsLatitude = Math.abs(first.value) <= 90;
+      const secondIsLongitude = Math.abs(second.value) <= 180;
+      if (!firstIsLatitude || !secondIsLongitude) continue;
+
+      const clickDistance = Math.hypot(first.centerX - clickX, first.centerY - clickY)
+        + Math.hypot(second.centerX - clickX, second.centerY - clickY);
+      const columnDistance = Math.abs(first.centerX - second.centerX);
+      const rowDistance = Math.abs(first.centerY - second.centerY);
+      const targetBonus = first.distance === 0 || second.distance === 0 ? 500 : 0;
+      const score = clickDistance + columnDistance * 2 + rowDistance * 0.15 - targetBonus;
+
+      if (!best || score < best.score) {
+        best = { score, latitude: first.value, longitude: second.value };
+      }
+    }
+  }
+
+  if (best) return { latitude: best.latitude, longitude: best.longitude };
+
   return null;
 }
 
 document.addEventListener("contextmenu", (event) => {
-  lastCoordinate = findCoordinate(event.target);
+  lastCoordinate = findCoordinate(event.target, event.clientX, event.clientY);
   chrome.runtime.sendMessage({ type: "geo-context", coordinate: lastCoordinate });
 }, true);
 
