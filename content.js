@@ -158,5 +158,10 @@ document.addEventListener("contextmenu", (event) => {
   chrome.runtime.sendMessage({ type: "geo-context", coordinate: lastCoordinate });
 }, true);
 
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type !== "get-geo-context") return;
+  sendResponse({ coordinate: lastCoordinate });
+});
+
 // Keep the variable alive for browser consoles and make the intent explicit.
 void lastCoordinate;

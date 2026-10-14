@@ -16,6 +16,17 @@ function setupContextMenu() {
   });
 }
 
+function openCoordinate(tabId, coordinate) {
+  if (!coordinate) return false;
+  const { latitude, longitude } = coordinate;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return false;
+
+  chrome.tabs.create({ url: `https://maps.google.com/?q=${latitude},${longitude}` });
+  smartCoordinateByTab.delete(tabId);
+  firstByTab.delete(tabId);
+  return true;
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   setupContextMenu();
 });
@@ -42,26 +53,32 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 
   const tabId = tab && tab.id;
   const smart = tabId == null ? null : smartCoordinateByTab.get(tabId);
-  if (smart && Date.now() - smart.timestamp < 10000 && smart.coordinate) {
-    const { latitude, longitude } = smart.coordinate;
-    chrome.tabs.create({ url: `https://maps.google.com/?q=${latitude},${longitude}` });
-    smartCoordinateByTab.delete(tabId);
-    firstByTab.delete(tabId);
+  if (smart && Date.now() - smart.timestamp < 10000 && openCoordinate(tabId, smart.coordinate)) {
     return;
   }
-
-  const num = extractNumber(info.selectionText);
-  if (!num) return;
 
   if (tabId == null) return;
-  if (!firstByTab.has(tabId)) {
-    firstByTab.set(tabId, num);
-    return;
-  }
 
-  const first = firstByTab.get(tabId);
-  const url = `https://maps.google.com/?q=${first},${num}`;
-  chrome.tabs.create({ url });
+  // Ask the frame that received the right-click for its latest DOM analysis.
+  chrome.tabs.sendMessage(
+    tabId,
+    { type: "get-geo-context" },
+    { frameId: Number.isInteger(info.frameId) ? info.frameId : 0 },
+    (response) => {
+      if (!chrome.runtime.lastError && openCoordinate(tabId, response?.coordinate)) return;
 
-  firstByTab.delete(tabId);
+      const num = extractNumber(info.selectionText);
+      if (!num) return;
+
+      if (!firstByTab.has(tabId)) {
+        firstByTab.set(tabId, num);
+        return;
+      }
+
+      openCoordinate(tabId, {
+        latitude: Number(firstByTab.get(tabId)),
+        longitude: Number(num)
+      });
+    }
+  );
 });
