@@ -44,6 +44,43 @@ function extractNumber(text) {
   return match ? match[0] : null;
 }
 
+function coordinateFromUrl(value) {
+  if (!value) return null;
+  let decoded = String(value);
+  try { decoded = decodeURIComponent(decoded); } catch {}
+
+  const geohack = decoded.match(/(\d{1,3})_(\d{1,2})_([\d.]+)_([NS])_(\d{1,3})_(\d{1,2})_([\d.]+)_([EW])/i);
+  if (geohack) {
+    const latitude = Number(geohack[1]) + Number(geohack[2]) / 60 + Number(geohack[3]) / 3600;
+    const longitude = Number(geohack[5]) + Number(geohack[6]) / 60 + Number(geohack[7]) / 3600;
+    return {
+      latitude: /[SW]/i.test(geohack[4]) ? -latitude : latitude,
+      longitude: /[W]/i.test(geohack[8]) ? -longitude : longitude
+    };
+  }
+
+  try {
+    const url = new URL(value);
+    const params = url.searchParams;
+    const pairs = [
+      [params.get("mlat"), params.get("mlon")],
+      ...["q", "query", "ll", "center", "coord", "coordinates"].map((key) =>
+        (params.get(key) || "").split(/[,;|/~]/)),
+      (params.get("cp") || "").split("~")
+    ];
+    for (const [latitudeText, longitudeText] of pairs) {
+      const latitude = Number(latitudeText);
+      const longitude = Number(longitudeText);
+      if (Number.isFinite(latitude) && Number.isFinite(longitude)
+        && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+        return { latitude, longitude };
+      }
+    }
+  } catch {}
+
+  return null;
+}
+
 function setupContextMenu() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
@@ -151,6 +188,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const tabId = tab && tab.id;
   chrome.storage.sync.get({ defaultProvider: DEFAULT_PROVIDER }, (settings) => {
     const provider = providerId || settings.defaultProvider || DEFAULT_PROVIDER;
+    const linkedCoordinate = coordinateFromUrl(info.linkUrl);
+    if (linkedCoordinate && openCoordinate(tabId, linkedCoordinate, provider)) return;
+
     const smart = tabId == null ? null : smartCoordinateByTab.get(tabId);
     if (smart && Date.now() - smart.timestamp < 10000 && openCoordinate(tabId, smart.coordinate, provider)) return;
 
