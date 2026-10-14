@@ -45,6 +45,24 @@ function classify(value, label) {
   return null;
 }
 
+function fixedPageCoordinate(target) {
+  let scope = target instanceof Element ? target : null;
+  for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
+    const fields = Array.from(scope.querySelectorAll("input[data-bind]"));
+    const latitudeField = fields.find((field) => /Clock(In|Out)Latitude/.test(field.dataset.bind));
+    const longitudeField = fields.find((field) => /Clock(In|Out)Longitude/.test(field.dataset.bind));
+
+    if (!latitudeField || !longitudeField) continue;
+    const latitude = Number(latitudeField.value);
+    const longitude = Number(longitudeField.value);
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      return { latitude, longitude };
+    }
+  }
+
+  return null;
+}
+
 function scopeFor(target) {
   let current = target instanceof Element ? target : document.body;
   let best = current;
@@ -90,6 +108,9 @@ function candidatesIn(scope, target) {
 }
 
 function findCoordinate(target, pointerX, pointerY) {
+  const fixedCoordinate = fixedPageCoordinate(target);
+  if (fixedCoordinate) return fixedCoordinate;
+
   let scope = target instanceof Element ? target : document.body;
   for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
     const candidates = candidatesIn(scope, target);
