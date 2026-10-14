@@ -86,6 +86,14 @@ function coordinateFromUrl(value) {
         return { latitude, longitude };
       }
     }
+    const mapHash = url.hash.match(/(?:map=\d+\/)?([-+]?\d{1,3}(?:\.\d+)?)\/([-+]?\d{1,3}(?:\.\d+)?)/);
+    if (mapHash) {
+      const latitude = Number(mapHash[1]);
+      const longitude = Number(mapHash[2]);
+      if (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+        return { latitude, longitude };
+      }
+    }
   } catch {}
 
   return null;

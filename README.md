@@ -2,7 +2,7 @@
 
 Right-click a latitude/longitude value and choose **Use as Geo Coordinate**. The extension looks for a nearby matching latitude/longitude pair and opens your selected map provider automatically.
 
-The detector also recognizes decimal coordinates, degrees/minutes/seconds, degrees and decimal minutes, cardinal directions, `geo:` links, common map URLs, and Geohack coordinate URLs in both decimal-cardinal and degrees/minutes/seconds forms. Right-clicking a supported coordinate link parses the link URL directly.
+The detector also recognizes decimal coordinates, degrees/minutes/seconds, degrees and decimal minutes, cardinal directions, `geo:` links, common map URLs, OpenStreetMap map fragments, and Geohack coordinate URLs in both decimal-cardinal and degrees/minutes/seconds forms. It can also use common HTML geotag metadata such as `geo.position`, `ICBM`, Geo microformats, and `GeoCoordinates`. Right-clicking a supported coordinate link parses the link URL directly.
 
 ## Map providers
 The default provider is Google Maps. Open the extension's Options page to change it, or use **Use as Geo Coordinate in...** from the right-click menu for a one-time choice. Supported providers are Google Maps, OpenStreetMap, Bing Maps, Apple Maps, Waze, HERE WeGo, and MapQuest.

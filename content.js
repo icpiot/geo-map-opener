@@ -97,6 +97,22 @@ function coordinateFromUrl(value) {
   return null;
 }
 
+function coordinateFromPageMetadata(target) {
+  const scope = target instanceof Element
+    ? target.closest(".geo, [itemtype*='GeoCoordinates']")
+    : null;
+  if (scope) {
+    const latitude = scope.querySelector(".latitude, [itemprop='latitude'], geo\\:lat")?.textContent;
+    const longitude = scope.querySelector(".longitude, [itemprop='longitude'], geo\\:long")?.textContent;
+    const pair = parseCoordinateText(`${latitude || ""},${longitude || ""}`);
+    if (pair) return pair;
+  }
+
+  const icbm = document.querySelector("meta[name='ICBM']")?.content;
+  const geoPosition = document.querySelector("meta[name='geo.position']")?.content;
+  return parseCoordinateText(icbm || geoPosition || "");
+}
+
 function numbersFrom(text) {
   return String(text || "")
     .match(NUMBER_PATTERN)
@@ -191,6 +207,9 @@ function findCoordinate(target, pointerX, pointerY) {
     ? target.innerText || target.textContent
     : "");
   if (visibleCoordinate) return visibleCoordinate;
+
+  const metadataCoordinate = coordinateFromPageMetadata(target);
+  if (metadataCoordinate) return metadataCoordinate;
 
   let scope = target instanceof Element ? target : document.body;
   for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
