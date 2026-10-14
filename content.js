@@ -26,14 +26,16 @@ function readableAttributes(element) {
 
 function nearbyLabel(element) {
   const parent = element.parentElement;
-  if (!parent) return "";
+  const label = element.closest("label");
+  const previous = element.previousElementSibling;
+  const previousLabel = previous?.matches("label, [role=label]") ? previous.textContent : "";
 
-  const siblingText = Array.from(parent.children)
-    .filter((child) => child !== element)
-    .map((child) => child.textContent.trim())
-    .join(" ");
-
-  return `${readableAttributes(element)} ${siblingText} ${readableAttributes(parent)}`;
+  return [
+    readableAttributes(element),
+    label?.textContent,
+    previousLabel,
+    readableAttributes(parent)
+  ].filter(Boolean).join(" ");
 }
 
 function classify(value, label) {
@@ -79,14 +81,19 @@ function candidatesIn(scope, target) {
 }
 
 function findCoordinate(target) {
-  const scope = scopeFor(target);
-  const candidates = candidatesIn(scope, target);
-  const latitude = candidates.find((candidate) => candidate.kind === "latitude");
-  const longitude = candidates.find((candidate) => candidate.kind === "longitude");
+  let scope = target instanceof Element ? target : document.body;
+  for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
+    const candidates = candidatesIn(scope, target);
+    const latitude = candidates.find((candidate) => candidate.kind === "latitude");
+    const longitude = candidates.find((candidate) => candidate.kind === "longitude");
 
-  if (latitude && longitude) {
-    return { latitude: latitude.value, longitude: longitude.value };
+    if (latitude && longitude) {
+      return { latitude: latitude.value, longitude: longitude.value };
+    }
   }
+
+  const broadScope = scopeFor(target);
+  const candidates = candidatesIn(broadScope, target);
 
   // Without labels, only use the nearest two values in the same small scope.
   const nearby = candidates.filter((candidate) => candidate.distance === 0 || candidate.element.parentElement === target.parentElement);
