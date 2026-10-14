@@ -1,10 +1,11 @@
 ﻿# Geo Map Opener - Smart Context-Menu Mode
 
-Highlight latitude then longitude (or vice-versa), choose **Use as Geo Coordinate** and the extension opens Google Maps automatically.
+Right-click a latitude/longitude value and choose **Use as Geo Coordinate**. The extension looks for a nearby matching latitude/longitude pair and opens Google Maps automatically.
 
 ## What it does
-Highlight latitude then longitude (or vice-versa), right-click **Use as Geo Coordinate**.
-When the second number is captured the extension opens Google Maps at that point.
+Right-click a value in a coordinate field and the extension checks nearby labels, field names, and values for the matching latitude/longitude pair. This helps when a page contains multiple coordinate sets.
+
+If the page does not expose useful labels, highlight the latitude and longitude separately and choose **Use as Geo Coordinate** for each one. The second number opens Google Maps.
 
 ## Developer install
 1. Clone this repo
@@ -20,5 +21,7 @@ When the second number is captured the extension opens Google Maps at that point
 ## Permissions
 * `contextMenus` - adds the right-click menu
 * `tabs` - opens Google Maps in a new tab
+
+The page helper only reads the local DOM around the right-clicked field. It does not send page data anywhere.
 
 > No data leaves the browser; everything stays local.
