@@ -4,6 +4,92 @@ const LONGITUDE_WORDS = /(^|[^a-z])(lon|lng|long|longitude)([^a-z]|$)/i;
 
 let lastCoordinate = null;
 
+function validCoordinate(latitude, longitude) {
+  return Number.isFinite(latitude) && Number.isFinite(longitude)
+    && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
+}
+
+function withHemisphere(value, hemisphere) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return /[SW]/i.test(hemisphere) ? -Math.abs(number) : Math.abs(number);
+}
+
+function dmsValue(degrees, minutes, seconds, hemisphere) {
+  const value = Number(degrees) + Number(minutes) / 60 + Number(seconds) / 3600;
+  return withHemisphere(value, hemisphere);
+}
+
+function parseCoordinateText(value) {
+  let text = String(value || "").replace(/[\u00a0]/g, " ");
+  try { text = decodeURIComponent(text); } catch {}
+
+  let match = text.match(/(\d{1,3})_(\d{1,2})_([\d.]+)_([NS])_(\d{1,3})_(\d{1,2})_([\d.]+)_([EW])/i);
+  if (match) {
+    const latitude = dmsValue(match[1], match[2], match[3], match[4]);
+    const longitude = dmsValue(match[5], match[6], match[7], match[8]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  const dmsPattern = /(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['′]\s*([\d.]+)\s*["″]?\s*([NS])\s*[,;/ ]+\s*(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['′]\s*([\d.]+)\s*["″]?\s*([EW])/i;
+  match = text.match(dmsPattern);
+  if (match) {
+    const latitude = dmsValue(match[1], match[2], match[3], match[4]);
+    const longitude = dmsValue(match[5], match[6], match[7], match[8]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  const ddmPattern = /(\d{1,3})\s*[°º]\s*([\d.]+)\s*['′]\s*([NS])\s*[,;/ ]+\s*(\d{1,3})\s*[°º]\s*([\d.]+)\s*['′]\s*([EW])/i;
+  match = text.match(ddmPattern);
+  if (match) {
+    const latitude = withHemisphere(Number(match[1]) + Number(match[2]) / 60, match[3]);
+    const longitude = withHemisphere(Number(match[4]) + Number(match[5]) / 60, match[6]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  const cardinalPattern = /([-+]?\d{1,3}(?:\.\d+)?)\s*([NS])\s*[,;/ ]+\s*([-+]?\d{1,3}(?:\.\d+)?)\s*([EW])/i;
+  match = text.match(cardinalPattern);
+  if (match) {
+    const latitude = withHemisphere(match[1], match[2]);
+    const longitude = withHemisphere(match[3], match[4]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  const decimalPattern = /([-+]?\d{1,3}(?:\.\d+)?)\s*[,;|/~]\s*([-+]?\d{1,3}(?:\.\d+)?)/;
+  match = text.match(decimalPattern);
+  if (match) {
+    const latitude = Number(match[1]);
+    const longitude = Number(match[2]);
+    return validCoordinate(latitude, longitude) ? { latitude, longitude } : null;
+  }
+
+  return null;
+}
+
+function coordinateFromUrl(value) {
+  if (!value) return null;
+  let decoded = String(value);
+  try { decoded = decodeURIComponent(decoded); } catch {}
+
+  const geohack = parseCoordinateText(decoded);
+  if (geohack) return geohack;
+
+  try {
+    const url = new URL(value, location.href);
+    const params = url.searchParams;
+    const separate = parseCoordinateText(`${params.get("mlat") || ""},${params.get("mlon") || ""}`);
+    if (separate) return separate;
+    for (const key of ["q", "query", "ll", "center", "coord", "coordinates", "cp"]) {
+      const parsed = parseCoordinateText(params.get(key));
+      if (parsed) return parsed;
+    }
+    const mapHash = url.hash.match(/(?:map=\d+\/)?([-+]?\d{1,3}(?:\.\d+)?)\/([-+]?\d{1,3}(?:\.\d+)?)/);
+    if (mapHash) return parseCoordinateText(`${mapHash[1]},${mapHash[2]}`);
+  } catch {}
+
+  return null;
+}
+
 function numbersFrom(text) {
   return String(text || "")
     .match(NUMBER_PATTERN)
@@ -90,6 +176,15 @@ function candidatesIn(scope, target) {
 }
 
 function findCoordinate(target, pointerX, pointerY) {
+  const link = target instanceof Element ? target.closest("a[href]") : null;
+  const linkedCoordinate = coordinateFromUrl(link?.href);
+  if (linkedCoordinate) return linkedCoordinate;
+
+  const visibleCoordinate = parseCoordinateText(target instanceof Element
+    ? target.innerText || target.textContent
+    : "");
+  if (visibleCoordinate) return visibleCoordinate;
+
   let scope = target instanceof Element ? target : document.body;
   for (let level = 0; scope && level < 8; level += 1, scope = scope.parentElement) {
     const candidates = candidatesIn(scope, target);
